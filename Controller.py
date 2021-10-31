@@ -1,5 +1,5 @@
 import pyotp
-from repository.APIRepository import login
+from Model import login
 from keys import keys
 
 
