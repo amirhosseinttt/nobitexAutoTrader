@@ -2,7 +2,7 @@ import requests
 import json
 
 
-def login(username: str, password: str):
+def login(username: str, password: str, otp_code: str):
     url = "https://api.nobitex.ir/auth/login/"
 
     payload = {'username': username,
@@ -12,7 +12,9 @@ def login(username: str, password: str):
     files = [
 
     ]
-    headers = {}
+    headers = {
+        'x-totp': otp_code,
+    }
 
     response = requests.request("POST", url, headers=headers, data=payload, files=files)
 
