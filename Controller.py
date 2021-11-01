@@ -16,4 +16,6 @@ def request_token():
     print(response.text)
 
 
-print(request_token())
+
+if __name__ == "__main__":
+    print(request_token())
