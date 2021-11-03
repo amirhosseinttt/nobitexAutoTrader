@@ -4,10 +4,10 @@ from Model import login, order_book, stats
 from keys import keys
 from time import sleep
 from logger import err_log
-import sys
 import pandas as pd
 import json
 import datetime
+from threading import Thread
 
 
 class Controller:
@@ -67,9 +67,11 @@ class Controller:
             exception = str(e)
 
         if response.status_code == 200:
-            response.json()
+            resp_json = response.json()
 
-        # todo: fill this part
+            print(resp_json)
+
+        print(response)
 
     def get_current_price(self):
         symbols = self.symbols.keys()
@@ -80,13 +82,12 @@ class Controller:
             src_string += symbol + ","
 
         src_string = src_string[:-1]
-        print(src_string)
 
         try:
             response = stats(str(src_string), "rls")
         except Exception as e:
             response = None
-            exception = str(e)
+            print(e)
 
         if response is None:
             pass
@@ -94,22 +95,24 @@ class Controller:
         else:
             if response.status_code == 200:
                 resp_json = response.json()
-                print(resp_json)
 
                 outcome = resp_json["stats"]
 
                 current_time = datetime.datetime.now()
+                try:
+                    for attribute, value in outcome.items():
+                        outcome[attribute]["bestSell"] = int(float(outcome[attribute]["bestSell"]))
+                        outcome[attribute]["bestBuy"] = int(float(outcome[attribute]["bestBuy"]))
+                        outcome[attribute]["latest"] = int(float(outcome[attribute]["latest"]))
+                        outcome[attribute]["dayLow"] = int(float(outcome[attribute]["dayLow"]))
+                        outcome[attribute]["dayHigh"] = int(float(outcome[attribute]["dayHigh"]))
+                        outcome[attribute]["dayOpen"] = int(float(outcome[attribute]["dayOpen"]))
+                        outcome[attribute]["dayClose"] = int(float(outcome[attribute]["dayClose"]))
 
-                # for attribute, value in outcome.items():
-                #     outcome[attribute]["bestSell"] = int(float(outcome[attribute]["bestSell"])) // 100
-                #     outcome[attribute]["bestBuy"] = int(float(outcome[attribute]["bestBuy"])) // 100
-                #     outcome[attribute]["latest"] = int(float(outcome[attribute]["latest"])) // 100
-                #     outcome[attribute]["dayLow"] = int(float(outcome[attribute]["dayLow"])) // 100
-                #     outcome[attribute]["dayHigh"] = int(float(outcome[attribute]["dayHigh"])) // 100
-                #     outcome[attribute]["dayOpen"] = int(float(outcome[attribute]["dayOpen"])) // 100
-                #     outcome[attribute]["dayClose"] = int(float(outcome[attribute]["dayClose"])) // 100
+                except Exception as e:
+                    print(e)
 
-                outcome["timestamp"] = current_time.timestamp()
+                outcome["timestamp"] = int(current_time.timestamp())
 
                 df = pd.json_normalize(outcome)
 
@@ -118,31 +121,47 @@ class Controller:
                 else:
                     self.price_df = pd.concat([self.price_df, df], ignore_index=True, axis=0)
 
-                print(df)
-
-                print("outcome_js:", outcome)
-
-                print(sys.getsizeof(outcome))
+            else:
+                err_log("get current price didn't return 200", response.text, response.status_code)
 
     def _collect_price_data(self):
         while True:
-            sleep(1)
             try:
-                self.get_current_price()
+                sleep(1)
+                try:
+                    self.get_current_price()
+                except Exception as e:
+                    print(e)
+
+                if self.price_df is not None and len(self.price_df.index) == 5:
+                    cur_time = datetime.datetime.now()
+                    dir_path = "priceData/" + str(cur_time.year) + "/" + str(cur_time.month) + "/" + str(cur_time.day)
+                    Path(dir_path).mkdir(parents=True, exist_ok=True)
+
+                    self.price_df.to_csv(dir_path + "/" + str(int(cur_time.timestamp())) + ".csv")
+                    self.price_df = None
             except Exception as e:
                 print(e)
 
-            if self.price_df is not None and len(self.price_df.index) == 5:
-                cur_time = datetime.datetime.now()
-                dir_path = "priceData/" + str(cur_time.year) + "/" + str(cur_time.month) + "/" + str(cur_time.day)
-                Path(dir_path).mkdir(parents=True, exist_ok=True)
+    def _get_orderbook_data(self):
+        while True:
+            try:
+                sleep(1)
+                try:
+                    self.get_order_data()
+                except Exception as e:
+                    print(e)
 
-                self.price_df.to_csv(dir_path + "/" + str(int(cur_time.timestamp())))
-                self.price_df = None
+            except Exception as e:
+                print(e)
 
     def start(self):
+        price_collector_thread = Thread(target=self._collect_price_data, args=(), name="price_collector_thread")
+        order_collector_thread = Thread(target=self._get_orderbook_data, args=(), name="order_book_collector_thread")
+
+        threads = [price_collector_thread, order_collector_thread]
+
+        for thread in threads:
+            thread.start()
+
         self._collect_price_data()
-        print(self.price_df)
-        print(self.price_df.head())
-        print(self.price_df.memory_usage())
-        print("sum:", self.price_df.memory_usage().sum())
