@@ -1,3 +1,4 @@
+import numpy
 import pyotp
 from Model import login, order_book, stats
 from keys import keys
@@ -6,6 +7,7 @@ from logger import err_log
 import sys
 import pandas as pd
 import json
+import datetime
 
 
 class Controller:
@@ -14,7 +16,9 @@ class Controller:
     price_df = None
 
     def __init__(self):
-        self.price_df = pd.DataFrame()
+        pd.set_option('display.max_rows', 500)
+        pd.set_option('display.max_columns', 500)
+        pd.set_option('display.width', 1000)
         with open("symbols.json", "rt") as json_file:
             self.symbols = json.load(json_file)
 
@@ -91,4 +95,46 @@ class Controller:
             if response.status_code == 200:
                 resp_json = response.json()
                 print(resp_json)
-                print(sys.getsizeof(resp_json))
+
+                outcome = resp_json["stats"]
+
+                current_time = datetime.datetime.now()
+
+                # for attribute, value in outcome.items():
+                #     outcome[attribute]["bestSell"] = int(float(outcome[attribute]["bestSell"])) // 100
+                #     outcome[attribute]["bestBuy"] = int(float(outcome[attribute]["bestBuy"])) // 100
+                #     outcome[attribute]["latest"] = int(float(outcome[attribute]["latest"])) // 100
+                #     outcome[attribute]["dayLow"] = int(float(outcome[attribute]["dayLow"])) // 100
+                #     outcome[attribute]["dayHigh"] = int(float(outcome[attribute]["dayHigh"])) // 100
+                #     outcome[attribute]["dayOpen"] = int(float(outcome[attribute]["dayOpen"])) // 100
+                #     outcome[attribute]["dayClose"] = int(float(outcome[attribute]["dayClose"])) // 100
+
+                outcome["timestamp"] = current_time.timestamp()
+
+                df = pd.json_normalize(outcome)
+
+                if self.price_df is None:
+                    self.price_df = df
+                else:
+                    self.price_df = pd.concat([self.price_df, df], ignore_index=True, axis=0)
+
+                print(df)
+
+                print("outcome_js:", outcome)
+
+                print(sys.getsizeof(outcome))
+
+    def _collect_price_data(self):
+        for _ in range(2):
+            sleep(1)
+            try:
+                self.get_current_price()
+            except Exception as e:
+                print(e)
+
+
+    def start(self):
+        print(self.price_df)
+        print(self.price_df.head())
+        print(self.price_df.memory_usage())
+        print("sum:", self.price_df.memory_usage().sum())
