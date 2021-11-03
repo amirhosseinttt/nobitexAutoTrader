@@ -1,0 +1,10 @@
+{
+  "btc": {
+    "full name": "Bitcoin",
+    "persian name": "بیت کوین"
+  },
+  "eth":{
+    "full name": "Ether",
+    "persian name": "اتر"
+  }
+}

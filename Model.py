@@ -52,7 +52,11 @@ def trades(symbol: str):
 def stats(src: str, dst: str):
     url = "https://api.nobitex.ir/market/stats"
 
-    payload = 'srcCurrency=' + src + '&dstCurrency=' + dst
+
+    payload = {
+        'srcCurrency' : src,
+        'dstCurrency': dst
+    }
     headers = {}
 
     response = requests.request("POST", url, headers=headers, data=payload)
