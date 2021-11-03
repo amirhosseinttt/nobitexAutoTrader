@@ -1,4 +1,4 @@
-import numpy
+from pathlib import Path
 import pyotp
 from Model import login, order_book, stats
 from keys import keys
@@ -125,15 +125,23 @@ class Controller:
                 print(sys.getsizeof(outcome))
 
     def _collect_price_data(self):
-        for _ in range(2):
+        while True:
             sleep(1)
             try:
                 self.get_current_price()
             except Exception as e:
                 print(e)
 
+            if self.price_df is not None and len(self.price_df.index) == 5:
+                cur_time = datetime.datetime.now()
+                dir_path = "priceData/" + str(cur_time.year) + "/" + str(cur_time.month) + "/" + str(cur_time.day)
+                Path(dir_path).mkdir(parents=True, exist_ok=True)
+
+                self.price_df.to_csv(dir_path + "/" + str(int(cur_time.timestamp())))
+                self.price_df = None
 
     def start(self):
+        self._collect_price_data()
         print(self.price_df)
         print(self.price_df.head())
         print(self.price_df.memory_usage())
