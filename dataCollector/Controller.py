@@ -2,8 +2,6 @@ from pathlib import Path
 import pyotp
 from Model import login, order_book, stats, trades
 from time import sleep
-from keys import keys
-from logger import err_log
 import pandas as pd
 import json
 import datetime
@@ -21,7 +19,12 @@ class Controller:
     symbol_to_list_dict = {}
     max_data_length = 10000
 
-    def __init__(self):
+    def __init__(self,keys,err_log):
+
+        self.keys = keys
+        self.err_log = err_log
+
+
         pd.set_option('display.max_rows', 500)
         pd.set_option('display.max_columns', 500)
         pd.set_option('display.width', 1000)
@@ -43,9 +46,9 @@ class Controller:
 
     def request_new_token(self):
         exception = ""
-        username = keys.key_dict['username']
-        password = keys.key_dict['password']
-        otp = str(self._get_2fa(keys.key_dict['2fa-backup']))
+        username = self.keys.key_dict['username']
+        password = self.keys.key_dict['password']
+        otp = str(self._get_2fa(self.keys.key_dict['2fa-backup']))
         try:
             response = login(username, password, otp)
         except Exception as e:
@@ -54,13 +57,13 @@ class Controller:
 
         while response is None or response.status_code != 200:
             if response is None:
-                err_log("login requests failed to send!", exception, 1)
+                self.err_log("login requests failed to send!", exception, 1)
             else:
-                err_log("login error", response.text, 1)
+                self.err_log("login error", response.text, 1)
             sleep(5)
-            username = keys.key_dict['username']
-            password = keys.key_dict['password']
-            otp = str(self._get_2fa(keys.key_dict['2fa-backup']))
+            username = self.keys.key_dict['username']
+            password = self.keys.key_dict['password']
+            otp = str(self._get_2fa(self.keys.key_dict['2fa-backup']))
             try:
                 response = login(username, password, otp)
             except Exception as e:
@@ -68,7 +71,7 @@ class Controller:
                 exception = str(e)
 
             if response is not None and response.status_code == 200:
-                err_log("login fixed", response.text, 200)
+                self.err_log("login fixed", response.text, 200)
 
         self.TOKEN = response.json()['key']
 
@@ -224,7 +227,7 @@ class Controller:
                     print(e)
 
             else:
-                err_log("get current price didn't return 200", response.text, response.status_code)
+                self.err_log("get current price didn't return 200", response.text, response.status_code)
 
     def _collect_price_data(self):
         while True:
