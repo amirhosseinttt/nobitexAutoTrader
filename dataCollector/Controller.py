@@ -19,7 +19,7 @@ class Controller:
     trade_list = []
     stats_list = []
     symbol_to_list_dict = {}
-    max_data_length = 5
+    max_data_length = 10000
 
     def __init__(self):
         pd.set_option('display.max_rows', 500)

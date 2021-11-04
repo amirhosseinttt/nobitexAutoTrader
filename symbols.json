@@ -6,5 +6,25 @@
   "eth":{
     "full name": "Ether",
     "persian name": "اتر"
+  },
+    "usdt":{
+    "full name": "Tether",
+    "persian name": "تتر"
+  },
+    "ada":{
+    "full name": "Cardano",
+    "persian name": "کاردانو"
+  },
+    "trx":{
+    "full name": "throne",
+    "persian name": "ترون"
+  },
+    "doge":{
+    "full name": "Doge coin",
+    "persian name": "دوج"
   }
+
+
+
+
 }
