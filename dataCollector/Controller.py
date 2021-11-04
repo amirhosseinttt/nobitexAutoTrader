@@ -1,10 +1,8 @@
 from pathlib import Path
 import pyotp
 from Model import login, order_book, stats, trades
-import sys
-
-from keys import keys
 from time import sleep
+from keys import keys
 from logger import err_log
 import pandas as pd
 import json
@@ -27,7 +25,6 @@ class Controller:
         pd.set_option('display.max_rows', 500)
         pd.set_option('display.max_columns', 500)
         pd.set_option('display.width', 1000)
-        sys.path.insert(0, '..')
 
         with open(os.path.dirname(__file__) + "/../symbols.json", "rt") as json_file:
             self.symbols = json.load(json_file)
