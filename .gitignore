@@ -1,6 +1,4 @@
 /keys/
 /venv/
-/priceData/
+/data/
 /.idea/
-/orderData/
-/tradeData/

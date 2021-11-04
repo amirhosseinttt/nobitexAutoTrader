@@ -9,6 +9,7 @@ import json
 import datetime
 from threading import Thread
 import pickle
+import os.path
 
 
 class Controller:
@@ -25,7 +26,7 @@ class Controller:
         pd.set_option('display.max_columns', 500)
         pd.set_option('display.width', 1000)
 
-        with open("../symbols.json", "rt") as json_file:
+        with open(os.path.dirname(__file__) + "/../symbols.json", "rt") as json_file:
             self.symbols = json.load(json_file)
 
         symbol_keys = self.symbols.keys()
@@ -102,8 +103,8 @@ class Controller:
             self.order_list[key].append(outcome)
 
             if len(self.order_list[key]) >= self.max_data_length:
-                dir_path = "orderData/" + original_symbol + "/" + str(current_time.year) + "/" + str(
-                    current_time.month) + "/" + str(current_time.day)
+                dir_path = os.path.dirname(__file__) + "/../data/orderData/" + original_symbol + "/" + str(
+                    current_time.year) + "/" + str(current_time.month) + "/" + str(current_time.day)
                 Path(dir_path).mkdir(parents=True, exist_ok=True)
                 with open(dir_path + "/" + str(timestamp) + ".pickle", "wb") as file:
                     pickle.dump(self.order_list[key], file, protocol=pickle.HIGHEST_PROTOCOL)
@@ -148,8 +149,8 @@ class Controller:
                 self.trade_list[key].append(item)
 
             if len(self.trade_list[key]) >= self.max_data_length:
-                dir_path = "tradeData/" + original_symbol + "/" + str(current_time.year) + "/" + str(
-                    current_time.month) + "/" + str(current_time.day)
+                dir_path = os.path.dirname(__file__) + "/../data/tradeData/" + original_symbol + "/" + str(
+                    current_time.year) + "/" + str(current_time.month) + "/" + str(current_time.day)
                 Path(dir_path).mkdir(parents=True, exist_ok=True)
                 try:
                     df = pd.DataFrame(self.trade_list[key])
@@ -207,12 +208,11 @@ class Controller:
                         self.stats_list[key].append(value)
 
                         if len(self.stats_list[key]) >= self.max_data_length:
-                            dir_path = "priceData/" + symbol + "/" + str(current_time.year) + "/" + str(
-                                current_time.month) + "/" + str(current_time.day)
+                            dir_path = os.path.dirname(__file__) + "/../data/priceData/" + symbol + "/" + str(
+                                current_time.year) + "/" + str(current_time.month) + "/" + str(current_time.day)
                             Path(dir_path).mkdir(parents=True, exist_ok=True)
                             try:
                                 df = pd.DataFrame(self.stats_list[key])
-                                print(df)
                                 df.to_csv(dir_path + "/" + str(timestamp) + ".csv")
                                 self.stats_list[key] = []
                             except Exception as e:
@@ -245,7 +245,7 @@ class Controller:
     def _get_trade_data(self, symbol):
         while True:
             try:
-                sleep(0.2)
+                sleep(0.5)
                 self.get_trade_data(symbol)
             except Exception as e:
                 print(e)
@@ -263,4 +263,3 @@ class Controller:
 
         for thread in threads:
             thread.start()
-
