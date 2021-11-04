@@ -259,6 +259,14 @@ class Controller:
             except Exception as e:
                 self.err_log("Exception in _get_trade_data", e)
 
+    def _thread_checker(self, threads_list: list):
+        while True:
+            sleep(60)
+            for thread in threads_list:
+                if not thread.is_alive():
+                    self.err_log("one Thread is not alive", str(thread.name))
+                    thread.start()
+
     def start(self):
         price_collector_thread = Thread(target=self._collect_price_data, args=(), name="price_collector")
 
@@ -267,8 +275,11 @@ class Controller:
         for symbol in self.symbols.keys():
             thread1 = Thread(target=self._get_orderbook_data, args=(symbol,), name=str(symbol) + "order_collector")
             thread2 = Thread(target=self._get_trade_data, args=(symbol,), name=str(symbol) + "trade_collector")
+
             threads.append(thread1)
             threads.append(thread2)
 
         for thread in threads:
             thread.start()
+
+        Thread(target=self._thread_checker, args=(threads,)).start()
