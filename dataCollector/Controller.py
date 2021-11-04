@@ -18,12 +18,13 @@ class Controller:
     stats_list = []
     symbol_to_list_dict = {}
     max_data_length = 10000
+    cool_down_time = 10  # seconds
+    trade_data_cool_down = 0
 
-    def __init__(self,keys,err_log):
+    def __init__(self, keys, err_log):
 
         self.keys = keys
         self.err_log = err_log
-
 
         pd.set_option('display.max_rows', 500)
         pd.set_option('display.max_columns', 500)
@@ -82,41 +83,40 @@ class Controller:
             response = order_book(symbol)
         except Exception as e:
             response = None
-            exception = str(e)
+            self.err_log("Exception in get_order_data", e)
 
-        if response is not None and response.status_code == 200:
-            resp_json = response.json()
+        if response is not None:
+            if response.status_code == 200:
+                resp_json = response.json()
 
-            current_time = datetime.datetime.now()
+                current_time = datetime.datetime.now()
 
-            bids = resp_json['bids']
-            for index in range(len(bids)):
-                tmp = [int(bids[index][0]), float(bids[index][1])]
-                bids[index] = tmp
+                bids = resp_json['bids']
+                for index in range(len(bids)):
+                    tmp = [int(bids[index][0]), float(bids[index][1])]
+                    bids[index] = tmp
 
-            asks = resp_json['asks']
-            for index in range(len(asks)):
-                tmp = [int(asks[index][0]), float(asks[index][1])]
-                asks[index] = tmp
+                asks = resp_json['asks']
+                for index in range(len(asks)):
+                    tmp = [int(asks[index][0]), float(asks[index][1])]
+                    asks[index] = tmp
 
-            timestamp = int(current_time.timestamp())
+                timestamp = int(current_time.timestamp())
 
-            outcome = [bids, asks, timestamp]
-            key = self.symbol_to_list_dict[original_symbol]
-            self.order_list[key].append(outcome)
+                outcome = [bids, asks, timestamp]
+                key = self.symbol_to_list_dict[original_symbol]
+                self.order_list[key].append(outcome)
 
-            if len(self.order_list[key]) >= self.max_data_length:
-                dir_path = os.path.dirname(__file__) + "/../data/orderData/" + original_symbol + "/" + str(
-                    current_time.year) + "/" + str(current_time.month) + "/" + str(current_time.day)
-                Path(dir_path).mkdir(parents=True, exist_ok=True)
-                with open(dir_path + "/" + str(timestamp) + ".pickle", "wb") as file:
-                    pickle.dump(self.order_list[key], file, protocol=pickle.HIGHEST_PROTOCOL)
-                    self.order_list[key] = []
+                if len(self.order_list[key]) >= self.max_data_length:
+                    dir_path = os.path.dirname(__file__) + "/../data/orderData/" + original_symbol + "/" + str(
+                        current_time.year) + "/" + str(current_time.month) + "/" + str(current_time.day)
+                    Path(dir_path).mkdir(parents=True, exist_ok=True)
+                    with open(dir_path + "/" + str(timestamp) + ".pickle", "wb") as file:
+                        pickle.dump(self.order_list[key], file, protocol=pickle.HIGHEST_PROTOCOL)
+                        self.order_list[key] = []
 
-
-
-        else:
-            print(response)
+            else:
+                self.err_log("Exception in get_order_data;\nresponse is not OK!", response.text, response.status_code)
 
     def get_trade_data(self, original_symbol: str):
         symbol = original_symbol.upper() + "IRT"
@@ -127,45 +127,48 @@ class Controller:
             response = None
             exception = str(e)
 
-        if response is not None and response.status_code == 200:
-            resp_json = response.json()
-            current_time = datetime.datetime.now()
-            timestamp = int(current_time.timestamp())
+        if response is not None:
+            if response.status_code == 200:
+                resp_json = response.json()
+                current_time = datetime.datetime.now()
+                timestamp = int(current_time.timestamp())
 
-            outcome = resp_json['trades']
-            key = self.symbol_to_list_dict[original_symbol]
-            outcome1 = []
-            if len(self.trade_list[key]) > 5:
-                for info in outcome:
-                    sw = True
-                    for item in self.trade_list[key][len(self.trade_list[key]) - 6:]:
-                        if info == item:
-                            sw = False
-                            break
-                    if sw:
-                        outcome1.append(info)
+                outcome = resp_json['trades']
+                key = self.symbol_to_list_dict[original_symbol]
+                outcome1 = []
+                if len(self.trade_list[key]) > 5:
+                    for info in outcome:
+                        sw = True
+                        for item in self.trade_list[key][len(self.trade_list[key]) - 6:]:
+                            if info == item:
+                                sw = False
+                                break
+                        if sw:
+                            outcome1.append(info)
 
+                else:
+                    for info in outcome:
+                        self.trade_list[key].append(info)
+                for item in outcome1:
+                    self.trade_list[key].append(item)
+
+                if len(self.trade_list[key]) >= self.max_data_length:
+                    dir_path = os.path.dirname(__file__) + "/../data/tradeData/" + original_symbol + "/" + str(
+                        current_time.year) + "/" + str(current_time.month) + "/" + str(current_time.day)
+                    Path(dir_path).mkdir(parents=True, exist_ok=True)
+                    try:
+                        df = pd.DataFrame(self.trade_list[key])
+                        df.to_csv(dir_path + "/" + str(timestamp) + ".csv")
+                        self.trade_list[key] = []
+                    except Exception as e:
+                        self.err_log("Exception in get_trade_data", e)
+
+            elif response.status_code == 429:  # too many requests
+                current_time = datetime.datetime.now()
+                timestamp = int(current_time.timestamp())
+                self.trade_data_cool_down = timestamp + self.cool_down_time
             else:
-                for info in outcome:
-                    self.trade_list[key].append(info)
-            for item in outcome1:
-                self.trade_list[key].append(item)
-
-            if len(self.trade_list[key]) >= self.max_data_length:
-                dir_path = os.path.dirname(__file__) + "/../data/tradeData/" + original_symbol + "/" + str(
-                    current_time.year) + "/" + str(current_time.month) + "/" + str(current_time.day)
-                Path(dir_path).mkdir(parents=True, exist_ok=True)
-                try:
-                    df = pd.DataFrame(self.trade_list[key])
-                    df.to_csv(dir_path + "/" + str(timestamp) + ".csv")
-                    self.trade_list[key] = []
-                except Exception as e:
-                    print(e)
-
-
-
-        else:
-            print(response)
+                self.err_log("Exception in get_trade_data;\nresponse is not OK!", response.text, response.status_code)
 
     def get_current_price(self):
         symbols = self.symbols.keys()
@@ -181,7 +184,7 @@ class Controller:
             response = stats(str(src_string), "rls")
         except Exception as e:
             response = None
-            print(e)
+            self.err_log("Exception in get_current_price", e)
 
         if response is None:
             pass
@@ -219,12 +222,12 @@ class Controller:
                                 df.to_csv(dir_path + "/" + str(timestamp) + ".csv")
                                 self.stats_list[key] = []
                             except Exception as e:
-                                print(e)
+                                self.err_log("Exception in get_current_price", e)
 
 
 
                 except Exception as e:
-                    print(e)
+                    self.err_log("Exception in get_current_price", e)
 
             else:
                 self.err_log("get current price didn't return 200", response.text, response.status_code)
@@ -235,7 +238,7 @@ class Controller:
                 sleep(1)
                 self.get_current_price()
             except Exception as e:
-                print(e)
+                self.err_log("Exception in _collect_price_data", e)
 
     def _get_orderbook_data(self, symbol):
         while True:
@@ -243,15 +246,18 @@ class Controller:
                 sleep(1)
                 self.get_order_data(symbol)
             except Exception as e:
-                print(e)
+                self.err_log("Exception in _get_orderbook_data", e)
 
     def _get_trade_data(self, symbol):
         while True:
             try:
-                sleep(0.5)
-                self.get_trade_data(symbol)
+                sleep(1)
+                current_time = datetime.datetime.now()
+                timestamp = int(current_time.timestamp())
+                if timestamp > self.trade_data_cool_down:
+                    self.get_trade_data(symbol)
             except Exception as e:
-                print(e)
+                self.err_log("Exception in _get_trade_data", e)
 
     def start(self):
         price_collector_thread = Thread(target=self._collect_price_data, args=(), name="price_collector")
