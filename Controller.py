@@ -1,6 +1,6 @@
 from pathlib import Path
 import pyotp
-from Model import login, order_book, stats
+from Model import login, order_book, stats, trades
 from keys import keys
 from time import sleep
 from logger import err_log
@@ -16,8 +16,9 @@ class Controller:
     symbols = None
     price_df = None
     order_list = []
+    trade_list = []
     symbol_to_list_dict = {}
-    max_data_length = 5
+    max_data_length = 40
 
     def __init__(self):
         pd.set_option('display.max_rows', 500)
@@ -32,6 +33,7 @@ class Controller:
         for index, key in enumerate(symbol_keys):
             self.symbol_to_list_dict[key] = index
             self.order_list.append([])
+            self.trade_list.append([])
 
     def _get_2fa(self, based32: str):
         totp = pyotp.TOTP(based32)
@@ -111,6 +113,55 @@ class Controller:
         else:
             print(response)
 
+    def get_trade_data(self, original_symbol: str):
+        symbol = original_symbol.upper() + "IRT"
+
+        try:
+            response = trades(symbol)
+        except Exception as e:
+            response = None
+            exception = str(e)
+
+        if response is not None and response.status_code == 200:
+            resp_json = response.json()
+            current_time = datetime.datetime.now()
+            timestamp = int(current_time.timestamp())
+
+            outcome = resp_json['trades']
+            key = self.symbol_to_list_dict[original_symbol]
+            outcome1 = []
+            if len(self.trade_list[key]) > 5:
+                for info in outcome:
+                    sw = True
+                    for item in self.trade_list[key][len(self.trade_list[key]) - 6:]:
+                        if info == item:
+                            sw = False
+                            break
+                    if sw:
+                        outcome1.append(info)
+
+            else:
+                for info in outcome:
+                    self.trade_list[key].append(info)
+            for item in outcome1:
+                self.trade_list[key].append(item)
+
+            if len(self.trade_list[key]) >= self.max_data_length:
+                dir_path = "tradeData/" + original_symbol + "/" + str(current_time.year) + "/" + str(
+                    current_time.month) + "/" + str(current_time.day)
+                Path(dir_path).mkdir(parents=True, exist_ok=True)
+                try:
+                    df = pd.DataFrame(self.trade_list[key])
+                    df.to_csv(dir_path + "/" + str(timestamp) + ".csv")
+                    self.trade_list[key] = []
+                except Exception as e:
+                    print(e)
+
+
+
+        else:
+            print(response)
+
     def get_current_price(self):
         symbols = self.symbols.keys()
 
@@ -171,13 +222,16 @@ class Controller:
                 except Exception as e:
                     print(e)
 
-                if self.price_df is not None and len(self.price_df.index) == self.max_data_length:
+                if self.price_df is not None and len(self.price_df.index) >= self.max_data_length:
                     cur_time = datetime.datetime.now()
                     dir_path = "priceData/" + str(cur_time.year) + "/" + str(cur_time.month) + "/" + str(cur_time.day)
                     Path(dir_path).mkdir(parents=True, exist_ok=True)
 
-                    self.price_df.to_csv(dir_path + "/" + str(int(cur_time.timestamp())) + ".csv")
-                    self.price_df = None
+                    try:
+                        self.price_df.to_csv(dir_path + "/" + str(int(cur_time.timestamp())) + ".csv")
+                        self.price_df = None
+                    except Exception as e:
+                        print(e)
             except Exception as e:
                 print(e)
 
@@ -193,14 +247,28 @@ class Controller:
             except Exception as e:
                 print(e)
 
+    def _get_trade_data(self, symbol):
+        while True:
+            try:
+                sleep(0.2)
+                try:
+                    self.get_trade_data(symbol)
+                except Exception as e:
+                    print(e)
+
+            except Exception as e:
+                print(e)
+
     def start(self):
         price_collector_thread = Thread(target=self._collect_price_data, args=(), name="price_collector")
 
         threads = [price_collector_thread]
 
         for symbol in self.symbols.keys():
-            thread = Thread(target=self._get_orderbook_data, args=(symbol,), name=str(symbol) + "order_collector")
-            threads.append(thread)
+            thread1 = Thread(target=self._get_orderbook_data, args=(symbol,), name=str(symbol) + "order_collector")
+            thread2 = Thread(target=self._get_trade_data, args=(symbol,), name=str(symbol) + "trade_collector")
+            threads.append(thread1)
+            threads.append(thread2)
 
         for thread in threads:
             thread.start()
