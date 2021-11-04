@@ -17,7 +17,7 @@ class Controller:
     trade_list = []
     stats_list = []
     symbol_to_list_dict = {}
-    max_data_length = 10000
+    max_data_length = 1000
     cool_down_time = 10  # seconds
     trade_data_cool_down = 0
 
