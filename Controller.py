@@ -14,11 +14,11 @@ import pickle
 class Controller:
     TOKEN = ""
     symbols = None
-    price_df = None
     order_list = []
     trade_list = []
+    stats_list = []
     symbol_to_list_dict = {}
-    max_data_length = 40
+    max_data_length = 5
 
     def __init__(self):
         pd.set_option('display.max_rows', 500)
@@ -34,6 +34,7 @@ class Controller:
             self.symbol_to_list_dict[key] = index
             self.order_list.append([])
             self.trade_list.append([])
+            self.stats_list.append([])
 
     def _get_2fa(self, based32: str):
         totp = pyotp.TOTP(based32)
@@ -188,6 +189,7 @@ class Controller:
                 outcome = resp_json["stats"]
 
                 current_time = datetime.datetime.now()
+                timestamp = int(current_time.timestamp())
                 try:
                     for attribute, value in outcome.items():
                         outcome[attribute]["bestSell"] = int(float(outcome[attribute]["bestSell"]))
@@ -198,17 +200,29 @@ class Controller:
                         outcome[attribute]["dayOpen"] = int(float(outcome[attribute]["dayOpen"]))
                         outcome[attribute]["dayClose"] = int(float(outcome[attribute]["dayClose"]))
 
+                    for attribute, value in outcome.items():
+                        symbol = attribute[:-4]
+                        key = self.symbol_to_list_dict[symbol]
+                        value['timeStamp'] = timestamp
+                        self.stats_list[key].append(value)
+
+                        if len(self.stats_list[key]) >= self.max_data_length:
+                            dir_path = "priceData/" + symbol + "/" + str(current_time.year) + "/" + str(
+                                current_time.month) + "/" + str(current_time.day)
+                            Path(dir_path).mkdir(parents=True, exist_ok=True)
+                            try:
+                                df = pd.DataFrame(self.stats_list[key])
+                                print(df)
+                                print(self.stats_list[key])
+                                df.to_csv(dir_path + "/" + str(timestamp) + ".csv")
+                                self.stats_list[key] = []
+                            except Exception as e:
+                                print(e)
+
+
+
                 except Exception as e:
                     print(e)
-
-                outcome["timestamp"] = int(current_time.timestamp())
-
-                df = pd.json_normalize(outcome)
-
-                if self.price_df is None:
-                    self.price_df = df
-                else:
-                    self.price_df = pd.concat([self.price_df, df], ignore_index=True, axis=0)
 
             else:
                 err_log("get current price didn't return 200", response.text, response.status_code)
@@ -217,21 +231,7 @@ class Controller:
         while True:
             try:
                 sleep(1)
-                try:
-                    self.get_current_price()
-                except Exception as e:
-                    print(e)
-
-                if self.price_df is not None and len(self.price_df.index) >= self.max_data_length:
-                    cur_time = datetime.datetime.now()
-                    dir_path = "priceData/" + str(cur_time.year) + "/" + str(cur_time.month) + "/" + str(cur_time.day)
-                    Path(dir_path).mkdir(parents=True, exist_ok=True)
-
-                    try:
-                        self.price_df.to_csv(dir_path + "/" + str(int(cur_time.timestamp())) + ".csv")
-                        self.price_df = None
-                    except Exception as e:
-                        print(e)
+                self.get_current_price()
             except Exception as e:
                 print(e)
 
@@ -239,11 +239,7 @@ class Controller:
         while True:
             try:
                 sleep(1)
-                try:
-                    self.get_order_data(symbol)
-                except Exception as e:
-                    print(e)
-
+                self.get_order_data(symbol)
             except Exception as e:
                 print(e)
 
@@ -251,11 +247,7 @@ class Controller:
         while True:
             try:
                 sleep(0.2)
-                try:
-                    self.get_trade_data(symbol)
-                except Exception as e:
-                    print(e)
-
+                self.get_trade_data(symbol)
             except Exception as e:
                 print(e)
 
