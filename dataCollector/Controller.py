@@ -25,7 +25,7 @@ class Controller:
         pd.set_option('display.max_columns', 500)
         pd.set_option('display.width', 1000)
 
-        with open("symbols.json", "rt") as json_file:
+        with open("../symbols.json", "rt") as json_file:
             self.symbols = json.load(json_file)
 
         symbol_keys = self.symbols.keys()
