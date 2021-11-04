@@ -213,7 +213,6 @@ class Controller:
                             try:
                                 df = pd.DataFrame(self.stats_list[key])
                                 print(df)
-                                print(self.stats_list[key])
                                 df.to_csv(dir_path + "/" + str(timestamp) + ".csv")
                                 self.stats_list[key] = []
                             except Exception as e:
@@ -265,4 +264,3 @@ class Controller:
         for thread in threads:
             thread.start()
 
-        self._collect_price_data()
